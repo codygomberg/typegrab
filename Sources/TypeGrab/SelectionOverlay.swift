@@ -20,9 +20,11 @@ final class SelectionOverlay {
             contentRect: screen.frame,
             styleMask: .borderless,
             backing: .buffered,
-            defer: false,
-            screen: screen
+            defer: false
         )
+        // setFrame uses unambiguous global screen coordinates (origin = main screen
+        // bottom-left), bypassing the per-screen-relative offset in the initializer.
+        win.setFrame(screen.frame, display: false)
         win.level = .screenSaver
         win.backgroundColor = .clear
         win.isOpaque = false
