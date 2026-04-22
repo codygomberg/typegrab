@@ -40,24 +40,19 @@ final class SelectionOverlay {
         NSCursor.crosshair.set()
     }
 
-    private func toGlobal(_ point: NSPoint, screen: NSScreen) -> NSPoint {
-        NSPoint(x: screen.frame.origin.x + point.x, y: screen.frame.origin.y + point.y)
-    }
-
     private func beginSelection(at point: NSPoint, screen: NSScreen) {
-        let global = toGlobal(point, screen: screen)
-        startGlobal = global
-        currentGlobal = global
+        startGlobal = NSEvent.mouseLocation
+        currentGlobal = NSEvent.mouseLocation
         activeScreen = screen
         refreshViews()
     }
 
     private func updateSelection(to point: NSPoint, screen: NSScreen) {
         guard activeScreen != nil else { return }
-        // AppKit delivers all drag events to the window that received mouseDown,
-        // so local coords can exceed screen bounds when the cursor is on another display.
-        // Converting through the originating screen gives correct global coords.
-        currentGlobal = toGlobal(point, screen: screen)
+        // NSEvent.mouseLocation gives the true global cursor position in AppKit
+        // screen coordinates regardless of which display the cursor is on,
+        // avoiding the clamping that happens with window-local drag event coords.
+        currentGlobal = NSEvent.mouseLocation
         refreshViews()
     }
 
@@ -66,7 +61,7 @@ final class SelectionOverlay {
             cancel()
             return
         }
-        let endG = toGlobal(point, screen: screen)
+        let endG = NSEvent.mouseLocation
         let globalRect = CGRect(
             x: min(startG.x, endG.x),
             y: min(startG.y, endG.y),
