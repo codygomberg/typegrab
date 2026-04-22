@@ -1,10 +1,8 @@
 import AppKit
 
 final class SelectionOverlay {
-    private var windows: [NSWindow] = []
-    private var startGlobal: NSPoint?
-    private var currentGlobal: NSPoint?
-    private var activeScreen: NSScreen?
+    private var window: OverlayWindow?
+    private var startPoint: NSPoint?
     private let completion: (CGRect?) -> Void
 
     init(completion: @escaping (CGRect?) -> Void) {
@@ -12,67 +10,76 @@ final class SelectionOverlay {
     }
 
     func show() {
-        for screen in NSScreen.screens {
-            let window = OverlayWindow(
-                contentRect: screen.frame,
-                styleMask: .borderless,
-                backing: .buffered,
-                defer: false,
-                screen: screen
-            )
-            window.level = .screenSaver
-            window.backgroundColor = .clear
-            window.isOpaque = false
-            window.hasShadow = false
-            window.ignoresMouseEvents = false
+        // Only cover the screen the cursor is on — avoids cross-display coord issues.
+        let cursorPos = NSEvent.mouseLocation
+        let screen = NSScreen.screens.first(where: { $0.frame.contains(cursorPos) })
+                     ?? NSScreen.main
+                     ?? NSScreen.screens[0]
 
-            let view = OverlayView(frame: NSRect(origin: .zero, size: screen.frame.size))
-            view.onMouseDown = { [weak self] pt in self?.beginSelection(at: pt, screen: screen) }
-            view.onMouseDragged = { [weak self] pt in self?.updateSelection(to: pt, screen: screen) }
-            view.onMouseUp = { [weak self] pt in self?.endSelection(at: pt, screen: screen) }
-            view.onCancel = { [weak self] in self?.cancel() }
-            window.contentView = view
-            window.makeFirstResponder(view)
-            window.makeKeyAndOrderFront(nil)
-            windows.append(window)
-        }
+        let win = OverlayWindow(
+            contentRect: screen.frame,
+            styleMask: .borderless,
+            backing: .buffered,
+            defer: false,
+            screen: screen
+        )
+        win.level = .screenSaver
+        win.backgroundColor = .clear
+        win.isOpaque = false
+        win.hasShadow = false
+        win.ignoresMouseEvents = false
+
+        let view = OverlayView(frame: NSRect(origin: .zero, size: screen.frame.size))
+        view.onMouseDown   = { [weak self] pt in self?.beginSelection(at: pt) }
+        view.onMouseDragged = { [weak self] pt in self?.updateSelection(to: pt) }
+        view.onMouseUp     = { [weak self] pt in self?.endSelection(at: pt, screen: screen) }
+        view.onCancel      = { [weak self] in self?.cancel() }
+        win.contentView = view
+        win.makeFirstResponder(view)
+        win.makeKeyAndOrderFront(nil)
+        window = win
+
         NSApp.activate(ignoringOtherApps: true)
         NSCursor.crosshair.set()
     }
 
-    private func beginSelection(at point: NSPoint, screen: NSScreen) {
-        startGlobal = NSEvent.mouseLocation
-        currentGlobal = NSEvent.mouseLocation
-        activeScreen = screen
-        refreshViews()
+    private func beginSelection(at point: NSPoint) {
+        startPoint = point
+        updateOverlay(to: point)
     }
 
-    private func updateSelection(to point: NSPoint, screen: NSScreen) {
-        guard activeScreen != nil else { return }
-        // NSEvent.mouseLocation gives the true global cursor position in AppKit
-        // screen coordinates regardless of which display the cursor is on,
-        // avoiding the clamping that happens with window-local drag event coords.
-        currentGlobal = NSEvent.mouseLocation
-        refreshViews()
+    private func updateSelection(to point: NSPoint) {
+        updateOverlay(to: point)
+    }
+
+    private func updateOverlay(to current: NSPoint) {
+        guard let view = window?.contentView as? OverlayView,
+              let start = startPoint else { return }
+        view.selectionRect = NSRect(
+            x: min(start.x, current.x),
+            y: min(start.y, current.y),
+            width: abs(current.x - start.x),
+            height: abs(current.y - start.y)
+        )
+        view.needsDisplay = true
     }
 
     private func endSelection(at point: NSPoint, screen: NSScreen) {
-        guard activeScreen != nil, let startG = startGlobal else {
-            cancel()
-            return
-        }
-        let endG = NSEvent.mouseLocation
-        let globalRect = CGRect(
-            x: min(startG.x, endG.x),
-            y: min(startG.y, endG.y),
-            width: abs(endG.x - startG.x),
-            height: abs(endG.y - startG.y)
+        guard let start = startPoint else { cancel(); return }
+        let rect = NSRect(
+            x: min(start.x, point.x),
+            y: min(start.y, point.y),
+            width: abs(point.x - start.x),
+            height: abs(point.y - start.y)
         )
         close()
-        guard globalRect.width > 4, globalRect.height > 4 else {
-            completion(nil)
-            return
-        }
+        guard rect.width > 4, rect.height > 4 else { completion(nil); return }
+        let globalRect = CGRect(
+            x: screen.frame.origin.x + rect.origin.x,
+            y: screen.frame.origin.y + rect.origin.y,
+            width: rect.width,
+            height: rect.height
+        )
         completion(globalRect)
     }
 
@@ -81,35 +88,9 @@ final class SelectionOverlay {
         completion(nil)
     }
 
-    private func refreshViews() {
-        guard let startG = startGlobal, let currentG = currentGlobal else { return }
-        let globalSelectionRect = NSRect(
-            x: min(startG.x, currentG.x),
-            y: min(startG.y, currentG.y),
-            width: abs(currentG.x - startG.x),
-            height: abs(currentG.y - startG.y)
-        )
-        for window in windows {
-            guard let view = window.contentView as? OverlayView,
-                  let screen = window.screen else { continue }
-            let intersection = globalSelectionRect.intersection(screen.frame)
-            if intersection.isNull || intersection.isEmpty {
-                view.selectionRect = nil
-            } else {
-                view.selectionRect = NSRect(
-                    x: intersection.origin.x - screen.frame.origin.x,
-                    y: intersection.origin.y - screen.frame.origin.y,
-                    width: intersection.width,
-                    height: intersection.height
-                )
-            }
-            view.needsDisplay = true
-        }
-    }
-
     private func close() {
-        for window in windows { window.orderOut(nil) }
-        windows.removeAll()
+        window?.orderOut(nil)
+        window = nil
         NSCursor.arrow.set()
     }
 }
