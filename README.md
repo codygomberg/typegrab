@@ -16,16 +16,18 @@ TypeGrab processes everything locally on your Mac. There is no telemetry, no ana
 
 ## Install
 
+### Homebrew (recommended)
+
+```bash
+brew tap codygomberg/typegrab https://github.com/codygomberg/typegrab
+brew install --cask typegrab
+```
+
+> **Note:** Because TypeGrab is not notarized, macOS will block the first launch. After installing, right-click `TypeGrab.app` in `/Applications` → **Open**, then click **Open** in the dialog. You only need to do this once.
+
 ### Pre-built release
 
-Download the latest `TypeGrab.app.zip` from the [Releases](../../releases) page, unzip, and drag `TypeGrab.app` to `/Applications`.
-
-Because the release is ad-hoc signed (not notarized), macOS Gatekeeper will block the first launch. To open it:
-
-1. Right-click `TypeGrab.app` → **Open**.
-2. Click **Open** in the dialog that appears.
-
-You only need to do this once.
+Download `TypeGrab.dmg` from the [Releases](../../releases) page, open it, and drag `TypeGrab.app` to `/Applications`. Then follow the same right-click → Open step above.
 
 ### Build from source
 
