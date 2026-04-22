@@ -2,8 +2,8 @@ import AppKit
 
 final class SelectionOverlay {
     private var windows: [NSWindow] = []
-    private var startPoint: NSPoint?
-    private var currentPoint: NSPoint?
+    private var startGlobal: NSPoint?
+    private var currentGlobal: NSPoint?
     private var activeScreen: NSScreen?
     private let completion: (CGRect?) -> Void
 
@@ -40,41 +40,44 @@ final class SelectionOverlay {
         NSCursor.crosshair.set()
     }
 
+    private func toGlobal(_ point: NSPoint, screen: NSScreen) -> NSPoint {
+        NSPoint(x: screen.frame.origin.x + point.x, y: screen.frame.origin.y + point.y)
+    }
+
     private func beginSelection(at point: NSPoint, screen: NSScreen) {
-        startPoint = point
-        currentPoint = point
+        let global = toGlobal(point, screen: screen)
+        startGlobal = global
+        currentGlobal = global
         activeScreen = screen
         refreshViews()
     }
 
     private func updateSelection(to point: NSPoint, screen: NSScreen) {
-        guard activeScreen === screen else { return }
-        currentPoint = point
+        guard activeScreen != nil else { return }
+        // AppKit delivers all drag events to the window that received mouseDown,
+        // so local coords can exceed screen bounds when the cursor is on another display.
+        // Converting through the originating screen gives correct global coords.
+        currentGlobal = toGlobal(point, screen: screen)
         refreshViews()
     }
 
     private func endSelection(at point: NSPoint, screen: NSScreen) {
-        guard activeScreen === screen, let start = startPoint else {
+        guard activeScreen != nil, let startG = startGlobal else {
             cancel()
             return
         }
-        let rect = NSRect(
-            x: min(start.x, point.x),
-            y: min(start.y, point.y),
-            width: abs(point.x - start.x),
-            height: abs(point.y - start.y)
+        let endG = toGlobal(point, screen: screen)
+        let globalRect = CGRect(
+            x: min(startG.x, endG.x),
+            y: min(startG.y, endG.y),
+            width: abs(endG.x - startG.x),
+            height: abs(endG.y - startG.y)
         )
         close()
-        guard rect.width > 4, rect.height > 4 else {
+        guard globalRect.width > 4, globalRect.height > 4 else {
             completion(nil)
             return
         }
-        let globalRect = CGRect(
-            x: screen.frame.origin.x + rect.origin.x,
-            y: screen.frame.origin.y + rect.origin.y,
-            width: rect.width,
-            height: rect.height
-        )
         completion(globalRect)
     }
 
@@ -84,17 +87,26 @@ final class SelectionOverlay {
     }
 
     private func refreshViews() {
+        guard let startG = startGlobal, let currentG = currentGlobal else { return }
+        let globalSelectionRect = NSRect(
+            x: min(startG.x, currentG.x),
+            y: min(startG.y, currentG.y),
+            width: abs(currentG.x - startG.x),
+            height: abs(currentG.y - startG.y)
+        )
         for window in windows {
-            guard let view = window.contentView as? OverlayView else { continue }
-            if window.screen === activeScreen, let start = startPoint, let current = currentPoint {
-                view.selectionRect = NSRect(
-                    x: min(start.x, current.x),
-                    y: min(start.y, current.y),
-                    width: abs(current.x - start.x),
-                    height: abs(current.y - start.y)
-                )
-            } else {
+            guard let view = window.contentView as? OverlayView,
+                  let screen = window.screen else { continue }
+            let intersection = globalSelectionRect.intersection(screen.frame)
+            if intersection.isNull || intersection.isEmpty {
                 view.selectionRect = nil
+            } else {
+                view.selectionRect = NSRect(
+                    x: intersection.origin.x - screen.frame.origin.x,
+                    y: intersection.origin.y - screen.frame.origin.y,
+                    width: intersection.width,
+                    height: intersection.height
+                )
             }
             view.needsDisplay = true
         }
