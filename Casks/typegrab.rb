@@ -1,6 +1,6 @@
 cask "typegrab" do
-  version "0.1.3"
-  sha256 "46a750c67ec1a9616ea86b127a66e5efe04eb7840479773fc0a4125660a8f66e"
+  version "0.1.4"
+  sha256 "e27b2a18c4280cb89cb63fd05930a4bfa19992d2b1e4748a18c02a0ef3404036"
 
   url "https://github.com/codygomberg/typegrab/releases/download/v#{version}/TypeGrab.dmg"
   name "TypeGrab"

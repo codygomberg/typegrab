@@ -7,7 +7,7 @@ A lightweight macOS menu-bar app for grabbing text out of anything on your scree
 
 - **On-device OCR.** No network calls, no API keys, no cloud.
 - **Menu-bar only.** No dock icon, no windows in your way.
-- **Global hotkey.** Configurable; default is ⌃⌥⌘T.
+- **Global hotkey.** Configurable; default is ⌘⇧2.
 - **Smart formatting.** Wrapped lines are rejoined into paragraphs; bullet and numbered lists are preserved.
 
 ## Privacy
@@ -46,7 +46,7 @@ The script generates the app icon, builds a release binary, assembles a `.app` b
 ## Usage
 
 1. Launch `TypeGrab.app` — a menu-bar icon appears.
-2. Press the hotkey (default **⌃⌥⌘T**) or choose **Capture Text** from the menu.
+2. Press the hotkey (default **⌘⇧2**) or choose **Capture Text** from the menu.
 3. Drag a rectangle over the text you want.
 4. Release — the recognized text is copied to your clipboard and a HUD confirms.
 

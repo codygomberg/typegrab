@@ -16,8 +16,8 @@ struct Hotkey: Codable, Equatable {
     }
 
     static let `default` = Hotkey(
-        keyCode: UInt32(kVK_ANSI_T),
-        modifiers: UInt32(controlKey | cmdKey)
+        keyCode: UInt32(kVK_ANSI_2),
+        modifiers: UInt32(cmdKey | shiftKey)
     )
 
     static func carbonModifiers(from flags: NSEvent.ModifierFlags) -> UInt32 {
